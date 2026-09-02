@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa de Risco Territorial Puro - Feira de Santana (BA)</title>
+  
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body, html {
+      height: 100%;
+      width: 100%;
+      font-family: 'Inter', -apple-system, sans-serif;
+      background-color: #0b0f19;
+      color: #f3f4f6;
+      overflow: hidden;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+      z-index: 1;
+      background: #0b0f19;
+    }
+
+    /* HUD Top Bar */
+    .top-bar {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+    .brand-card {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 16px 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+      max-width: 460px;
+    }
+    .brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+    .brand-sub {
+      font-size: 12.5px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+
+    /* Search & Filter Bar */
+    .controls-bar {
+      pointer-events: auto;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .search-input {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #f8fafc;
+      padding: 12px 18px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      width: 260px;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .search-input:focus {
+      border-color: #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+    }
+    .filter-btn {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover, .filter-btn.active {
+      background: #1e293b;
+      color: #38bdf8;
+      border-color: #38bdf8;
+    }
+
+    /* Floating Legend */
+    .legend-card {
+      position: absolute;
+      bottom: 24px;
+      left: 20px;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 16px 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+      min-width: 280px;
+    }
+    .legend-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12.5px;
+      margin-bottom: 8px;
+      color: #e2e8f0;
+    }
+    .legend-item:last-child {
+      margin-bottom: 0;
+    }
+    .color-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 10px currentColor;
+    }
+
+    /* Detail Drawer Card (Right) */
+    .detail-card {
+      position: absolute;
+      top: 90px;
+      right: 20px;
+      width: 350px;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      display: none;
+      animation: slideIn 0.25s ease-out forwards;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+    .detail-name {
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      color: #ffffff;
+    }
+    .detail-zone {
+      font-size: 12px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+    .detail-badge {
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .metric-box {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .metric-label {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+    .metric-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+    .metric-val.highlight {
+      color: #38bdf8;
+    }
+    .metric-sub {
+      font-size: 10px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 12.5px;
+    }
+    .stat-row:last-child {
+      border-bottom: none;
+    }
+    .stat-label {
+      color: #94a3b8;
+    }
+    .stat-value {
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+    .close-btn {
+      background: none;
+      border: none;
+      color: #64748b;
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px;
+    }
+    .close-btn:hover {
+      color: #cbd5e1;
+    }
+
+    /* Custom Leaflet Tooltip */
+    .custom-tooltip {
+      background: rgba(15, 23, 42, 0.9) !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      color: #f8fafc !important;
+      border-radius: 8px !important;
+      padding: 6px 12px !important;
+      font-family: 'Inter', sans-serif !important;
+      font-size: 12px !important;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+    }
+    .leaflet-tooltip-left:before, .leaflet-tooltip-right:before {
+      border: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div class="brand-card">
+      <div class="brand-title">🗺️ FEIRA DE SANTANA • RISCO ATUARIAL</div>
+      <div class="brand-sub">Overlay de Custo de Risco Puro (% da FIPE) e Sinistralidade Territorial por Bairro (SUSEP/AUTOSEG).</div>
+    </div>
+    
+    <div class="controls-bar">
+      <input type="text" id="searchBox" class="search-input" placeholder="Buscar Bairro ou CEP (ex: SIM, 44085)...">
+      <button class="filter-btn active" onclick="filtrarRisco('todos', this)">Todos</button>
+      <button class="filter-btn" onclick="filtrarRisco('critico', this)">Crítico</button>
+      <button class="filter-btn" onclick="filtrarRisco('elevado', this)">Elevado</button>
+      <button class="filter-btn" onclick="filtrarRisco('baixo', this)">Baixo</button>
+    </div>
+  </div>
+
+  <!-- Floating Legend -->
+  <div class="legend-card">
+    <div class="legend-title">Custo de Risco Puro (% FIPE)</div>
+    <div class="legend-item">
+      <div class="color-dot" style="background:#ef4444; color:#ef4444;"></div>
+      <span>Crítico (&gt; 8.5% FIPE / &gt; 1.50x)</span>
+    </div>
+    <div class="legend-item">
+      <div class="color-dot" style="background:#f97316; color:#f97316;"></div>
+      <span>Elevado (6.0% a 8.5% FIPE / 1.16x a 1.49x)</span>
+    </div>
+    <div class="legend-item">
+      <div class="color-dot" style="background:#eab308; color:#eab308;"></div>
+      <span>Médio (4.0% a 6.0% FIPE / 0.86x a 1.15x)</span>
+    </div>
+    <div class="legend-item">
+      <div class="color-dot" style="background:#10b981; color:#10b981;"></div>
+      <span>Baixo Risco (&lt; 4.0% FIPE / &lt; 0.85x)</span>
+    </div>
+
+    <!-- Inspetor de Bairro ao Passar o Mouse -->
+    <div id="legendHoverBox" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12); font-size: 12px;">
+      <div style="font-size: 11px; text-transform: uppercase; color: #38bdf8; font-weight: 700; margin-bottom: 4px;">🎯 Inspetor de Bairro (Hover)</div>
+      <div id="hoverBairroNome" style="font-weight: 700; font-size: 13.5px; color: #ffffff;">Passe o mouse em um ponto...</div>
+      <div id="hoverFrota" style="color: #94a3b8; margin-top: 3px;">🚘 Frota: <b>-- veículos</b></div>
+      <div id="hoverRisco" style="color: #94a3b8;">📊 Risco Puro: <b>--% FIPE</b></div>
+    </div>
+  </div>
+
+  <!-- Detail Drawer Card -->
+  <div id="detailCard" class="detail-card">
+    <div class="detail-header">
+      <div>
+        <div id="detBairro" class="detail-name">Bairro</div>
+        <div id="detZone" class="detail-zone">Zona • CEP 00000</div>
+      </div>
+      <button class="close-btn" onclick="fecharDetalhe()">&times;</button>
+    </div>
+
+    <div class="metric-grid">
+      <div class="metric-box">
+        <div class="metric-label">Custo Risco Puro</div>
+        <div id="detCustoPuro" class="metric-val highlight">0.0%</div>
+        <div class="metric-sub">do valor FIPE/ano</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label">Fator Territorial</div>
+        <div id="detFator" class="metric-val">1.00x</div>
+        <div id="detFatorSub" class="metric-sub">vs média da cidade</div>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <span class="stat-label">Diagnóstico de Risco:</span>
+      <span id="detDiag" class="stat-value">Padrão</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Freq. Perda Total (PT):</span>
+      <span id="detFreqPT" class="stat-value">0.0% / ano</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Freq. Colisão Parcial:</span>
+      <span id="detFreqCol" class="stat-value">0.0% / ano</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Sinistros de PT / Colisão:</span>
+      <span id="detSinistros" class="stat-value">0 / 0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Prêmio Médio Observado:</span>
+      <span id="detPremioMed" class="stat-value">R$ 0,00</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Veículos-Ano Segurados:</span>
+      <span id="detExpostos" class="stat-value">0 expostos</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Faixa Postal:</span>
+      <span id="detFaixa" class="stat-value" style="font-size:11px;">44000-000 a 44000-999</span>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    const bairrosData = [{"bairro": "Bairro/Região CEP 44065", "zona": "Urbana", "prefixo_5d": "44065", "faixa_cep": "44065-000 a 44065-999", "lat": -12.2575, "lon": -38.951299999999996, "fator_risco": 1.95, "taxa_risco_puro_fipe": 9.82, "freq_pt": 8.28, "freq_colisao": 10.98, "freq_roubo": 0.0, "sin_pt": 2, "sin_colisao": 3, "sin_roubo": 0, "veiculos_expostos": 18.64, "premio_medio_rs": 1474.98, "diagnostico": "Risco Crítico (Alto Sinistro)", "cor": "#ef4444", "nivel_cor": "critico"}, {"bairro": "Bairro/Região CEP 44079", "zona": "Urbana", "prefixo_5d": "44079", "faixa_cep": "44079-000 a 44079-999", "lat": -12.2255, "lon": -38.942299999999996, "fator_risco": 1.87, "taxa_risco_puro_fipe": 6.18, "freq_pt": 4.18, "freq_colisao": 14.32, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 2, "sin_roubo": 0, "veiculos_expostos": 3.82, "premio_medio_rs": 2657.44, "diagnostico": "Risco Crítico (Alto Sinistro)", "cor": "#ef4444", "nivel_cor": "critico"}, {"bairro": "Brasília", "zona": "Sul", "prefixo_5d": "44088", "faixa_cep": "44088-000 a 44089-999", "lat": -12.274, "lon": -38.956, "fator_risco": 1.86, "taxa_risco_puro_fipe": 8.63, "freq_pt": 7.04, "freq_colisao": 11.32, "freq_roubo": 0.0, "sin_pt": 4, "sin_colisao": 7, "sin_roubo": 0, "veiculos_expostos": 52.96, "premio_medio_rs": 1747.08, "diagnostico": "Risco Crítico (Alto Sinistro)", "cor": "#ef4444", "nivel_cor": "critico"}, {"bairro": "SIM", "zona": "Leste", "prefixo_5d": "44085", "faixa_cep": "44085-000 a 44086-999", "lat": -12.268, "lon": -38.918, "fator_risco": 1.83, "taxa_risco_puro_fipe": 9.79, "freq_pt": 8.45, "freq_colisao": 9.58, "freq_roubo": 0.0, "sin_pt": 6, "sin_colisao": 7, "sin_roubo": 0, "veiculos_expostos": 65.33, "premio_medio_rs": 2177.09, "diagnostico": "Risco Crítico (Alto Sinistro)", "cor": "#ef4444", "nivel_cor": "critico"}, {"bairro": "Mangabeira", "zona": "Norte", "prefixo_5d": "44056", "faixa_cep": "44056-000 a 44057-999", "lat": -12.238, "lon": -38.939, "fator_risco": 1.55, "taxa_risco_puro_fipe": 8.0, "freq_pt": 6.82, "freq_colisao": 8.46, "freq_roubo": 0.0, "sin_pt": 3, "sin_colisao": 4, "sin_roubo": 0, "veiculos_expostos": 40.53, "premio_medio_rs": 1577.31, "diagnostico": "Risco Crítico (Alto Sinistro)", "cor": "#ef4444", "nivel_cor": "critico"}, {"bairro": "Jaíba", "zona": "Distrito", "prefixo_5d": "44130", "faixa_cep": "44130-000 a 44130-999", "lat": -12.305, "lon": -38.868, "fator_risco": 1.55, "taxa_risco_puro_fipe": 11.63, "freq_pt": 11.03, "freq_colisao": 4.29, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 1.2, "premio_medio_rs": 933.26, "diagnostico": "Risco Crítico (Alto Sinistro)", "cor": "#ef4444", "nivel_cor": "critico"}, {"bairro": "Bairro/Região CEP 44033", "zona": "Urbana", "prefixo_5d": "44033", "faixa_cep": "44033-000 a 44033-999", "lat": -12.2735, "lon": -38.9783, "fator_risco": 1.53, "taxa_risco_puro_fipe": 8.8, "freq_pt": 7.77, "freq_colisao": 7.37, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 8.0, "premio_medio_rs": 1055.06, "diagnostico": "Risco Crítico (Alto Sinistro)", "cor": "#ef4444", "nivel_cor": "critico"}, {"bairro": "Bairro/Região CEP 44036", "zona": "Urbana", "prefixo_5d": "44036", "faixa_cep": "44036-000 a 44036-999", "lat": -12.249500000000001, "lon": -38.9783, "fator_risco": 1.48, "taxa_risco_puro_fipe": 6.02, "freq_pt": 4.62, "freq_colisao": 9.97, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 2.01, "premio_medio_rs": 2699.81, "diagnostico": "Risco Crítico (Alto Sinistro)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Tomba", "zona": "Sul", "prefixo_5d": "44090", "faixa_cep": "44090-000 a 44091-999", "lat": -12.29, "lon": -38.959, "fator_risco": 1.44, "taxa_risco_puro_fipe": 9.43, "freq_pt": 8.66, "freq_colisao": 5.53, "freq_roubo": 0.0, "sin_pt": 5, "sin_colisao": 3, "sin_roubo": 0, "veiculos_expostos": 51.84, "premio_medio_rs": 1515.82, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Gabriela", "zona": "Oeste", "prefixo_5d": "44028", "faixa_cep": "44028-000 a 44028-999", "lat": -12.235, "lon": -38.995, "fator_risco": 1.4, "taxa_risco_puro_fipe": 9.33, "freq_pt": 8.6, "freq_colisao": 5.23, "freq_roubo": 0.0, "sin_pt": 2, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 17.4, "premio_medio_rs": 1053.63, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Bairro/Região CEP 44009", "zona": "Urbana", "prefixo_5d": "44009", "faixa_cep": "44009-000 a 44009-999", "lat": -12.2255, "lon": -39.0053, "fator_risco": 1.4, "taxa_risco_puro_fipe": 11.44, "freq_pt": 11.06, "freq_colisao": 2.76, "freq_roubo": 0.0, "sin_pt": 2, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 10.2, "premio_medio_rs": 1069.43, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Asa Branca", "zona": "Norte", "prefixo_5d": "44044", "faixa_cep": "44044-000 a 44046-878", "lat": -12.215, "lon": -38.991, "fator_risco": 1.38, "taxa_risco_puro_fipe": 10.34, "freq_pt": 9.8, "freq_colisao": 3.82, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 3.22, "premio_medio_rs": 508.36, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Bairro/Região CEP 44061", "zona": "Urbana", "prefixo_5d": "44061", "faixa_cep": "44061-000 a 44061-999", "lat": -12.2895, "lon": -38.951299999999996, "fator_risco": 1.33, "taxa_risco_puro_fipe": 10.0, "freq_pt": 9.48, "freq_colisao": 3.69, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 3.84, "premio_medio_rs": 2272.09, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Bairro/Região CEP 44051", "zona": "Urbana", "prefixo_5d": "44051", "faixa_cep": "44051-000 a 44051-999", "lat": -12.2895, "lon": -38.9603, "fator_risco": 1.32, "taxa_risco_puro_fipe": 9.59, "freq_pt": 9.02, "freq_colisao": 4.04, "freq_roubo": 0.0, "sin_pt": 3, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 26.96, "premio_medio_rs": 1296.92, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Santo Antônio dos Prazeres", "zona": "Leste", "prefixo_5d": "44071", "faixa_cep": "44071-000 a 44072-999", "lat": -12.245, "lon": -38.919, "fator_risco": 1.31, "taxa_risco_puro_fipe": 8.7, "freq_pt": 8.02, "freq_colisao": 4.88, "freq_roubo": 0.0, "sin_pt": 2, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 19.75, "premio_medio_rs": 1258.32, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Bairro/Região CEP 44050", "zona": "Urbana", "prefixo_5d": "44050", "faixa_cep": "44050-000 a 44050-999", "lat": -12.2975, "lon": -38.9603, "fator_risco": 1.29, "taxa_risco_puro_fipe": 8.2, "freq_pt": 7.46, "freq_colisao": 5.31, "freq_roubo": 0.0, "sin_pt": 3, "sin_colisao": 2, "sin_roubo": 0, "veiculos_expostos": 35.78, "premio_medio_rs": 2005.99, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Matinha", "zona": "Distrito", "prefixo_5d": "44115", "faixa_cep": "44115-000 a 44115-999", "lat": -12.185, "lon": -38.915, "fator_risco": 1.25, "taxa_risco_puro_fipe": 5.11, "freq_pt": 3.92, "freq_colisao": 8.46, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 5.04, "premio_medio_rs": 805.91, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Bairro/Região CEP 44022", "zona": "Urbana", "prefixo_5d": "44022", "faixa_cep": "44022-000 a 44022-999", "lat": -12.2815, "lon": -38.9873, "fator_risco": 1.24, "taxa_risco_puro_fipe": 5.05, "freq_pt": 3.88, "freq_colisao": 8.35, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 5.29, "premio_medio_rs": 1900.15, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Bairro/Região CEP 44055", "zona": "Urbana", "prefixo_5d": "44055", "faixa_cep": "44055-000 a 44055-999", "lat": -12.2575, "lon": -38.9603, "fator_risco": 1.24, "taxa_risco_puro_fipe": 5.06, "freq_pt": 3.89, "freq_colisao": 8.38, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 5.24, "premio_medio_rs": 2821.36, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Bairro/Região CEP 44024", "zona": "Urbana", "prefixo_5d": "44024", "faixa_cep": "44024-000 a 44024-999", "lat": -12.2655, "lon": -38.9873, "fator_risco": 1.22, "taxa_risco_puro_fipe": 9.35, "freq_pt": 8.91, "freq_colisao": 3.15, "freq_roubo": 0.0, "sin_pt": 4, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 38.73, "premio_medio_rs": 1495.1, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Bairro/Região CEP 44057", "zona": "Urbana", "prefixo_5d": "44057", "faixa_cep": "44057-000 a 44057-999", "lat": -12.2415, "lon": -38.9603, "fator_risco": 1.2, "taxa_risco_puro_fipe": 9.02, "freq_pt": 8.56, "freq_colisao": 3.33, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 5.88, "premio_medio_rs": 1560.56, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Papagaio", "zona": "Norte", "prefixo_5d": "44059", "faixa_cep": "44059-000 a 44059-999", "lat": -12.215, "lon": -38.948, "fator_risco": 1.16, "taxa_risco_puro_fipe": 4.81, "freq_pt": 3.73, "freq_colisao": 7.72, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 3, "sin_roubo": 0, "veiculos_expostos": 32.86, "premio_medio_rs": 1071.57, "diagnostico": "Risco Elevado (Agravado)", "cor": "#f97316", "nivel_cor": "elevado"}, {"bairro": "Santa Mônica", "zona": "Leste", "prefixo_5d": "44077", "faixa_cep": "44077-000 a 44078-999", "lat": -12.258, "lon": -38.938, "fator_risco": 1.15, "taxa_risco_puro_fipe": 6.52, "freq_pt": 5.74, "freq_colisao": 5.6, "freq_roubo": 0.0, "sin_pt": 3, "sin_colisao": 3, "sin_roubo": 0, "veiculos_expostos": 50.98, "premio_medio_rs": 1780.24, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44086", "zona": "Urbana", "prefixo_5d": "44086", "faixa_cep": "44086-000 a 44086-999", "lat": -12.249500000000001, "lon": -38.933299999999996, "fator_risco": 1.15, "taxa_risco_puro_fipe": 4.68, "freq_pt": 3.59, "freq_colisao": 7.74, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 6.89, "premio_medio_rs": 2790.33, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "CIS (Centro Industrial do Subaé)", "zona": "Sul", "prefixo_5d": "44010", "faixa_cep": "44010-860 a 44010-899", "lat": -12.308, "lon": -38.968, "fator_risco": 1.14, "taxa_risco_puro_fipe": 8.21, "freq_pt": 7.71, "freq_colisao": 3.59, "freq_roubo": 0.0, "sin_pt": 5, "sin_colisao": 2, "sin_roubo": 0, "veiculos_expostos": 60.05, "premio_medio_rs": 1628.7, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Campo Limpo", "zona": "Norte", "prefixo_5d": "44032", "faixa_cep": "44032-001 a 44035-899", "lat": -12.229, "lon": -38.982, "fator_risco": 1.13, "taxa_risco_puro_fipe": 5.71, "freq_pt": 4.82, "freq_colisao": 6.39, "freq_roubo": 0.0, "sin_pt": 2, "sin_colisao": 3, "sin_roubo": 0, "veiculos_expostos": 42.85, "premio_medio_rs": 1521.04, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44096", "zona": "Urbana", "prefixo_5d": "44096", "faixa_cep": "44096-000 a 44096-999", "lat": -12.249500000000001, "lon": -38.924299999999995, "fator_risco": 1.13, "taxa_risco_puro_fipe": 4.59, "freq_pt": 3.53, "freq_colisao": 7.6, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 7.3, "premio_medio_rs": 1017.26, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44008", "zona": "Urbana", "prefixo_5d": "44008", "faixa_cep": "44008-000 a 44008-999", "lat": -12.233500000000001, "lon": -39.0053, "fator_risco": 1.03, "taxa_risco_puro_fipe": 7.69, "freq_pt": 7.29, "freq_colisao": 2.84, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 9.51, "premio_medio_rs": 1260.05, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44023", "zona": "Urbana", "prefixo_5d": "44023", "faixa_cep": "44023-000 a 44023-999", "lat": -12.2735, "lon": -38.9873, "fator_risco": 1.03, "taxa_risco_puro_fipe": 4.19, "freq_pt": 3.22, "freq_colisao": 6.93, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 9.45, "premio_medio_rs": 1066.06, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44082", "zona": "Urbana", "prefixo_5d": "44082", "faixa_cep": "44082-000 a 44082-999", "lat": -12.2815, "lon": -38.933299999999996, "fator_risco": 0.99, "taxa_risco_puro_fipe": 8.12, "freq_pt": 7.84, "freq_colisao": 1.96, "freq_roubo": 0.0, "sin_pt": 2, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 20.52, "premio_medio_rs": 2411.52, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Aviário", "zona": "Sul", "prefixo_5d": "44095", "faixa_cep": "44095-000 a 44096-780", "lat": -12.302, "lon": -38.935, "fator_risco": 0.99, "taxa_risco_puro_fipe": 7.43, "freq_pt": 7.05, "freq_colisao": 2.74, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 10.35, "premio_medio_rs": 1188.2, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44037", "zona": "Urbana", "prefixo_5d": "44037", "faixa_cep": "44037-000 a 44037-999", "lat": -12.2415, "lon": -38.9783, "fator_risco": 0.99, "taxa_risco_puro_fipe": 5.81, "freq_pt": 5.17, "freq_colisao": 4.57, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.21, "premio_medio_rs": 714.58, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44016", "zona": "Urbana", "prefixo_5d": "44016", "faixa_cep": "44016-000 a 44016-999", "lat": -12.249500000000001, "lon": -38.9963, "fator_risco": 0.99, "taxa_risco_puro_fipe": 5.81, "freq_pt": 5.17, "freq_colisao": 4.57, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.21, "premio_medio_rs": 1039.19, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Aeroporto", "zona": "Leste", "prefixo_5d": "44069", "faixa_cep": "44069-010 a 44069-706", "lat": -12.208, "lon": -38.912, "fator_risco": 0.99, "taxa_risco_puro_fipe": 5.86, "freq_pt": 5.21, "freq_colisao": 4.61, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.08, "premio_medio_rs": 1212.09, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44067", "zona": "Urbana", "prefixo_5d": "44067", "faixa_cep": "44067-000 a 44067-999", "lat": -12.2415, "lon": -38.951299999999996, "fator_risco": 0.97, "taxa_risco_puro_fipe": 3.93, "freq_pt": 3.02, "freq_colisao": 6.51, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 11.02, "premio_medio_rs": 1072.46, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Pampalona", "zona": "Oeste", "prefixo_5d": "44020", "faixa_cep": "44020-770 a 44031-670", "lat": -12.242, "lon": -38.986, "fator_risco": 0.97, "taxa_risco_puro_fipe": 7.24, "freq_pt": 6.87, "freq_colisao": 2.67, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 11.01, "premio_medio_rs": 1525.28, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44080", "zona": "Urbana", "prefixo_5d": "44080", "faixa_cep": "44080-000 a 44080-999", "lat": -12.2975, "lon": -38.933299999999996, "fator_risco": 0.97, "taxa_risco_puro_fipe": 5.7, "freq_pt": 5.07, "freq_colisao": 4.48, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.51, "premio_medio_rs": 5252.93, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44029", "zona": "Urbana", "prefixo_5d": "44029", "faixa_cep": "44029-000 a 44029-999", "lat": -12.2255, "lon": -38.9873, "fator_risco": 0.97, "taxa_risco_puro_fipe": 5.7, "freq_pt": 5.07, "freq_colisao": 4.48, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.5, "premio_medio_rs": 1117.04, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44083", "zona": "Urbana", "prefixo_5d": "44083", "faixa_cep": "44083-000 a 44083-999", "lat": -12.2735, "lon": -38.933299999999996, "fator_risco": 0.97, "taxa_risco_puro_fipe": 5.7, "freq_pt": 5.07, "freq_colisao": 4.48, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.5, "premio_medio_rs": 1969.7, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Jaguara", "zona": "Distrito", "prefixo_5d": "44125", "faixa_cep": "44125-000 a 44125-999", "lat": -12.215, "lon": -39.265, "fator_risco": 0.97, "taxa_risco_puro_fipe": 5.7, "freq_pt": 5.07, "freq_colisao": 4.48, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.5, "premio_medio_rs": 615.34, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44035", "zona": "Urbana", "prefixo_5d": "44035", "faixa_cep": "44035-000 a 44035-999", "lat": -12.2575, "lon": -38.9783, "fator_risco": 0.97, "taxa_risco_puro_fipe": 5.7, "freq_pt": 5.07, "freq_colisao": 4.48, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.5, "premio_medio_rs": 432.35, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44070", "zona": "Urbana", "prefixo_5d": "44070", "faixa_cep": "44070-000 a 44070-999", "lat": -12.2975, "lon": -38.942299999999996, "fator_risco": 0.97, "taxa_risco_puro_fipe": 5.73, "freq_pt": 5.1, "freq_colisao": 4.51, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.41, "premio_medio_rs": 775.48, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44149", "zona": "Urbana", "prefixo_5d": "44149", "faixa_cep": "44149-000 a 44149-999", "lat": -12.2255, "lon": -38.9693, "fator_risco": 0.96, "taxa_risco_puro_fipe": 5.63, "freq_pt": 5.01, "freq_colisao": 4.43, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.69, "premio_medio_rs": 633.8, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44019", "zona": "Urbana", "prefixo_5d": "44019", "faixa_cep": "44019-000 a 44019-999", "lat": -12.2255, "lon": -38.9963, "fator_risco": 0.95, "taxa_risco_puro_fipe": 5.6, "freq_pt": 4.98, "freq_colisao": 4.41, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.78, "premio_medio_rs": 1611.62, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44042", "zona": "Urbana", "prefixo_5d": "44042", "faixa_cep": "44042-000 a 44042-999", "lat": -12.2815, "lon": -38.9693, "fator_risco": 0.95, "taxa_risco_puro_fipe": 5.61, "freq_pt": 4.99, "freq_colisao": 4.41, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.75, "premio_medio_rs": 822.28, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44040", "zona": "Urbana", "prefixo_5d": "44040", "faixa_cep": "44040-000 a 44040-999", "lat": -12.2975, "lon": -38.9693, "fator_risco": 0.94, "taxa_risco_puro_fipe": 5.51, "freq_pt": 4.91, "freq_colisao": 4.34, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 1.03, "premio_medio_rs": 1547.99, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44026", "zona": "Urbana", "prefixo_5d": "44026", "faixa_cep": "44026-000 a 44026-999", "lat": -12.249500000000001, "lon": -38.9873, "fator_risco": 0.94, "taxa_risco_puro_fipe": 5.52, "freq_pt": 4.91, "freq_colisao": 4.34, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 1.01, "premio_medio_rs": 683.62, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44062", "zona": "Urbana", "prefixo_5d": "44062", "faixa_cep": "44062-000 a 44062-999", "lat": -12.2815, "lon": -38.951299999999996, "fator_risco": 0.94, "taxa_risco_puro_fipe": 5.52, "freq_pt": 4.91, "freq_colisao": 4.34, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 1.01, "premio_medio_rs": 1013.93, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44025", "zona": "Urbana", "prefixo_5d": "44025", "faixa_cep": "44025-000 a 44025-999", "lat": -12.2575, "lon": -38.9873, "fator_risco": 0.94, "taxa_risco_puro_fipe": 5.52, "freq_pt": 4.91, "freq_colisao": 4.34, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 1.01, "premio_medio_rs": 1290.46, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44137", "zona": "Urbana", "prefixo_5d": "44137", "faixa_cep": "44137-000 a 44137-999", "lat": -12.2415, "lon": -38.9783, "fator_risco": 0.94, "taxa_risco_puro_fipe": 5.52, "freq_pt": 4.91, "freq_colisao": 4.34, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 1.01, "premio_medio_rs": 1101.96, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44068", "zona": "Urbana", "prefixo_5d": "44068", "faixa_cep": "44068-000 a 44068-999", "lat": -12.233500000000001, "lon": -38.951299999999996, "fator_risco": 0.94, "taxa_risco_puro_fipe": 5.52, "freq_pt": 4.91, "freq_colisao": 4.34, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 1.01, "premio_medio_rs": 1037.21, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44043", "zona": "Urbana", "prefixo_5d": "44043", "faixa_cep": "44043-000 a 44043-999", "lat": -12.2735, "lon": -38.9693, "fator_risco": 0.94, "taxa_risco_puro_fipe": 5.54, "freq_pt": 4.93, "freq_colisao": 4.36, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.96, "premio_medio_rs": 866.9, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Queimadinha", "zona": "Oeste", "prefixo_5d": "44015", "faixa_cep": "44015-000 a 44016-999", "lat": -12.255, "lon": -38.972, "fator_risco": 0.94, "taxa_risco_puro_fipe": 5.54, "freq_pt": 4.93, "freq_colisao": 4.36, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.94, "premio_medio_rs": 709.86, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bonfim de Feira", "zona": "Distrito", "prefixo_5d": "44120", "faixa_cep": "44120-000 a 44120-999", "lat": -12.165, "lon": -39.185, "fator_risco": 0.94, "taxa_risco_puro_fipe": 5.55, "freq_pt": 4.94, "freq_colisao": 4.37, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 0.92, "premio_medio_rs": 2236.48, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Parque Ipê", "zona": "Norte", "prefixo_5d": "44054", "faixa_cep": "44054-000 a 44054-800", "lat": -12.234, "lon": -38.956, "fator_risco": 0.91, "taxa_risco_puro_fipe": 6.06, "freq_pt": 5.58, "freq_colisao": 3.4, "freq_roubo": 0.0, "sin_pt": 2, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 34.9, "premio_medio_rs": 1610.93, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44118", "zona": "Urbana", "prefixo_5d": "44118", "faixa_cep": "44118-000 a 44118-999", "lat": -12.233500000000001, "lon": -38.9963, "fator_risco": 0.91, "taxa_risco_puro_fipe": 5.39, "freq_pt": 4.79, "freq_colisao": 4.24, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 1.4, "premio_medio_rs": 1149.94, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Gov. João Durval Carneiro (Ipuaçu)", "zona": "Distrito", "prefixo_5d": "44140", "faixa_cep": "44140-000 a 44140-999", "lat": -12.385, "lon": -39.195, "fator_risco": 0.89, "taxa_risco_puro_fipe": 5.27, "freq_pt": 4.69, "freq_colisao": 4.15, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 1.76, "premio_medio_rs": 1708.12, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44046", "zona": "Urbana", "prefixo_5d": "44046", "faixa_cep": "44046-000 a 44046-999", "lat": -12.249500000000001, "lon": -38.9693, "fator_risco": 0.87, "taxa_risco_puro_fipe": 5.15, "freq_pt": 4.58, "freq_colisao": 4.05, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 2.16, "premio_medio_rs": 1185.02, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44100", "zona": "Urbana", "prefixo_5d": "44100", "faixa_cep": "44100-000 a 44100-999", "lat": -12.2975, "lon": -39.0053, "fator_risco": 0.87, "taxa_risco_puro_fipe": 5.15, "freq_pt": 4.59, "freq_colisao": 4.05, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 2.15, "premio_medio_rs": 951.76, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44091", "zona": "Urbana", "prefixo_5d": "44091", "faixa_cep": "44091-000 a 44091-999", "lat": -12.2895, "lon": -38.924299999999995, "fator_risco": 0.86, "taxa_risco_puro_fipe": 5.71, "freq_pt": 5.26, "freq_colisao": 3.2, "freq_roubo": 0.0, "sin_pt": 2, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 38.0, "premio_medio_rs": 1316.12, "diagnostico": "Risco Médio (Padrão)", "cor": "#eab308", "nivel_cor": "medio"}, {"bairro": "Bairro/Região CEP 44030", "zona": "Urbana", "prefixo_5d": "44030", "faixa_cep": "44030-000 a 44030-999", "lat": -12.2975, "lon": -38.9783, "fator_risco": 0.84, "taxa_risco_puro_fipe": 4.95, "freq_pt": 4.4, "freq_colisao": 3.89, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 2.86, "premio_medio_rs": 1020.46, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44013", "zona": "Urbana", "prefixo_5d": "44013", "faixa_cep": "44013-000 a 44013-999", "lat": -12.2735, "lon": -38.9963, "fator_risco": 0.84, "taxa_risco_puro_fipe": 4.96, "freq_pt": 4.41, "freq_colisao": 3.9, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 2.83, "premio_medio_rs": 776.58, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "35º BI", "zona": "Sul", "prefixo_5d": "44094", "faixa_cep": "44094-000 a 44094-846", "lat": -12.281, "lon": -38.942, "fator_risco": 0.82, "taxa_risco_puro_fipe": 3.32, "freq_pt": 2.55, "freq_colisao": 5.51, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 15.79, "premio_medio_rs": 965.49, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44060", "zona": "Urbana", "prefixo_5d": "44060", "faixa_cep": "44060-000 a 44060-999", "lat": -12.2975, "lon": -38.951299999999996, "fator_risco": 0.82, "taxa_risco_puro_fipe": 4.82, "freq_pt": 4.29, "freq_colisao": 3.79, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 3.32, "premio_medio_rs": 1128.84, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44006", "zona": "Urbana", "prefixo_5d": "44006", "faixa_cep": "44006-000 a 44006-999", "lat": -12.249500000000001, "lon": -39.0053, "fator_risco": 0.78, "taxa_risco_puro_fipe": 5.85, "freq_pt": 5.54, "freq_colisao": 2.16, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 17.22, "premio_medio_rs": 905.44, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44072", "zona": "Urbana", "prefixo_5d": "44072", "faixa_cep": "44072-000 a 44072-999", "lat": -12.2815, "lon": -38.942299999999996, "fator_risco": 0.78, "taxa_risco_puro_fipe": 4.57, "freq_pt": 4.07, "freq_colisao": 3.6, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 4.32, "premio_medio_rs": 1292.41, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44097", "zona": "Urbana", "prefixo_5d": "44097", "faixa_cep": "44097-000 a 44097-999", "lat": -12.2415, "lon": -38.924299999999995, "fator_risco": 0.76, "taxa_risco_puro_fipe": 3.11, "freq_pt": 2.39, "freq_colisao": 5.14, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 17.96, "premio_medio_rs": 1387.94, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Cidade Nova", "zona": "Norte", "prefixo_5d": "44053", "faixa_cep": "44053-000 a 44054-999", "lat": -12.228, "lon": -38.961, "fator_risco": 0.72, "taxa_risco_puro_fipe": 2.39, "freq_pt": 1.61, "freq_colisao": 5.54, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 2, "sin_roubo": 0, "veiculos_expostos": 33.69, "premio_medio_rs": 1302.79, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44021", "zona": "Urbana", "prefixo_5d": "44021", "faixa_cep": "44021-000 a 44021-999", "lat": -12.2895, "lon": -38.9873, "fator_risco": 0.72, "taxa_risco_puro_fipe": 2.94, "freq_pt": 2.26, "freq_colisao": 4.87, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 19.81, "premio_medio_rs": 1194.47, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Ponto Central", "zona": "Centro-Leste", "prefixo_5d": "44075", "faixa_cep": "44075-000 a 44075-800", "lat": -12.256, "lon": -38.952, "fator_risco": 0.71, "taxa_risco_puro_fipe": 5.8, "freq_pt": 5.61, "freq_colisao": 1.4, "freq_roubo": 0.0, "sin_pt": 2, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 34.71, "premio_medio_rs": 1542.52, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Caseb", "zona": "Leste", "prefixo_5d": "44052", "faixa_cep": "44052-001 a 44052-182", "lat": -12.251, "lon": -38.948, "fator_risco": 0.7, "taxa_risco_puro_fipe": 4.03, "freq_pt": 3.56, "freq_colisao": 3.38, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 35.19, "premio_medio_rs": 994.72, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44078", "zona": "Urbana", "prefixo_5d": "44078", "faixa_cep": "44078-000 a 44078-999", "lat": -12.233500000000001, "lon": -38.942299999999996, "fator_risco": 0.69, "taxa_risco_puro_fipe": 4.05, "freq_pt": 3.61, "freq_colisao": 3.19, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 6.8, "premio_medio_rs": 1333.26, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44089", "zona": "Urbana", "prefixo_5d": "44089", "faixa_cep": "44089-000 a 44089-999", "lat": -12.2255, "lon": -38.933299999999996, "fator_risco": 0.68, "taxa_risco_puro_fipe": 5.13, "freq_pt": 4.86, "freq_colisao": 1.89, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 21.72, "premio_medio_rs": 1428.26, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Registro", "zona": "Leste", "prefixo_5d": "44073", "faixa_cep": "44073-000 a 44073-999", "lat": -12.252, "lon": -38.922, "fator_risco": 0.68, "taxa_risco_puro_fipe": 4.02, "freq_pt": 3.58, "freq_colisao": 3.16, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 6.98, "premio_medio_rs": 1582.29, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Maria Quitéria (São José)", "zona": "Distrito", "prefixo_5d": "44110", "faixa_cep": "44110-000 a 44110-999", "lat": -12.115, "lon": -38.978, "fator_risco": 0.66, "taxa_risco_puro_fipe": 3.9, "freq_pt": 3.47, "freq_colisao": 3.07, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 7.67, "premio_medio_rs": 1474.83, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44004", "zona": "Urbana", "prefixo_5d": "44004", "faixa_cep": "44004-000 a 44004-999", "lat": -12.2655, "lon": -39.0053, "fator_risco": 0.61, "taxa_risco_puro_fipe": 3.61, "freq_pt": 3.22, "freq_colisao": 2.84, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 9.45, "premio_medio_rs": 1577.68, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Humildes", "zona": "Distrito Rural/Industrial", "prefixo_5d": "44135", "faixa_cep": "44135-000 a 44135-999", "lat": -12.348, "lon": -38.895, "fator_risco": 0.6, "taxa_risco_puro_fipe": 2.44, "freq_pt": 1.87, "freq_colisao": 4.04, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 1, "sin_roubo": 0, "veiculos_expostos": 26.99, "premio_medio_rs": 1138.82, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44031", "zona": "Urbana", "prefixo_5d": "44031", "faixa_cep": "44031-000 a 44031-999", "lat": -12.2895, "lon": -38.9783, "fator_risco": 0.58, "taxa_risco_puro_fipe": 3.42, "freq_pt": 3.05, "freq_colisao": 2.69, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 10.82, "premio_medio_rs": 938.52, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "George Américo", "zona": "Norte", "prefixo_5d": "44034", "faixa_cep": "44034-000 a 44034-900", "lat": -12.22, "lon": -38.972, "fator_risco": 0.55, "taxa_risco_puro_fipe": 3.21, "freq_pt": 2.86, "freq_colisao": 2.53, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 12.5, "premio_medio_rs": 2138.47, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44005", "zona": "Urbana", "prefixo_5d": "44005", "faixa_cep": "44005-000 a 44005-999", "lat": -12.2575, "lon": -39.0053, "fator_risco": 0.55, "taxa_risco_puro_fipe": 3.22, "freq_pt": 2.87, "freq_colisao": 2.53, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 12.44, "premio_medio_rs": 1257.97, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44002", "zona": "Urbana", "prefixo_5d": "44002", "faixa_cep": "44002-000 a 44002-999", "lat": -12.2815, "lon": -39.0053, "fator_risco": 0.53, "taxa_risco_puro_fipe": 3.11, "freq_pt": 2.76, "freq_colisao": 2.44, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 13.44, "premio_medio_rs": 1213.06, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Serraria Brasil", "zona": "Centro", "prefixo_5d": "44003", "faixa_cep": "44003-000 a 44003-700", "lat": -12.269, "lon": -38.965, "fator_risco": 0.5, "taxa_risco_puro_fipe": 3.75, "freq_pt": 3.55, "freq_colisao": 1.38, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 35.25, "premio_medio_rs": 2108.17, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Feira X", "zona": "Sul", "prefixo_5d": "44092", "faixa_cep": "44092-000 a 44092-899", "lat": -12.285, "lon": -38.983, "fator_risco": 0.48, "taxa_risco_puro_fipe": 2.81, "freq_pt": 2.5, "freq_colisao": 2.21, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 16.49, "premio_medio_rs": 1438.85, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Kalilândia", "zona": "Centro", "prefixo_5d": "44001", "faixa_cep": "44001-020 a 44001-900", "lat": -12.257, "lon": -38.962, "fator_risco": 0.39, "taxa_risco_puro_fipe": 2.89, "freq_pt": 2.74, "freq_colisao": 1.07, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 50.15, "premio_medio_rs": 1419.89, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44066", "zona": "Urbana", "prefixo_5d": "44066", "faixa_cep": "44066-000 a 44066-999", "lat": -12.249500000000001, "lon": -38.951299999999996, "fator_risco": 0.39, "taxa_risco_puro_fipe": 2.32, "freq_pt": 2.06, "freq_colisao": 1.82, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 23.17, "premio_medio_rs": 1031.23, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Parque Getúlio Vargas", "zona": "Leste", "prefixo_5d": "44076", "faixa_cep": "44076-500 a 44076-890", "lat": -12.26, "lon": -38.944, "fator_risco": 0.38, "taxa_risco_puro_fipe": 2.86, "freq_pt": 2.72, "freq_colisao": 1.06, "freq_roubo": 0.0, "sin_pt": 1, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 50.76, "premio_medio_rs": 1804.41, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}, {"bairro": "Bairro/Região CEP 44007", "zona": "Urbana", "prefixo_5d": "44007", "faixa_cep": "44007-000 a 44007-999", "lat": -12.2415, "lon": -39.0053, "fator_risco": 0.3, "taxa_risco_puro_fipe": 1.78, "freq_pt": 1.59, "freq_colisao": 1.4, "freq_roubo": 0.0, "sin_pt": 0, "sin_colisao": 0, "sin_roubo": 0, "veiculos_expostos": 34.54, "premio_medio_rs": 1461.06, "diagnostico": "Baixo Risco (Desconto)", "cor": "#10b981", "nivel_cor": "baixo"}];
+
+    // Inicializa o mapa centralizado em Feira de Santana
+    const map = L.map('map', {
+      center: [-12.2575, -38.9603],
+      zoom: 13,
+      zoomControl: false
+    });
+
+    // TileLayer CartoDB Dark Matter para estética ultra premium
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map);
+
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    let markers = [];
+    let filtroAtual = 'todos';
+
+    function renderMarkers() {
+      // Limpa marcadores anteriores
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+
+      bairrosData.forEach(item => {
+        if (filtroAtual !== 'todos' && item.nivel_cor !== filtroAtual) {
+          return;
+        }
+
+        // Raio do círculo proporcional ao volume de veículos segurados (mínimo 16px, máximo 42px)
+        const radius = Math.max(16, Math.min(42, Math.sqrt(item.veiculos_expostos) * 4.2));
+
+        const circle = L.circleMarker([item.lat, item.lon], {
+          radius: radius,
+          fillColor: item.cor,
+          color: '#ffffff',
+          weight: 2,
+          opacity: 0.85,
+          fillOpacity: 0.65
+        }).addTo(map);
+
+        // Tooltip flutuante ao passar o mouse com quantidade de veículos
+        circle.bindTooltip(`
+          <div style="font-weight:800; font-size:13.5px; color:#ffffff; margin-bottom:4px;">${item.bairro}</div>
+          <div style="color:#e2e8f0; font-size:12px; margin-bottom:2px;">🚗 Frota Segurada: <b style="color:#38bdf8;">${item.veiculos_expostos.toFixed(1)} veículos-ano</b></div>
+          <div style="color:#e2e8f0; font-size:12px; margin-bottom:2px;">📊 Custo Risco Puro: <b style="color:${item.cor};">${item.taxa_risco_puro_fipe.toFixed(2)}% FIPE</b></div>
+          <div style="color:#94a3b8; font-size:11px;">Fator Territorial: <b>${item.fator_risco.toFixed(2)}x</b> (${item.diagnostico})</div>
+        `, {
+          className: 'custom-tooltip',
+          direction: 'top',
+          offset: [0, -radius]
+        });
+
+        // Eventos de Hover para atualizar em tempo real o Inspetor da Legenda
+        circle.on('mouseover', () => {
+          circle.setStyle({ weight: 3.5, fillOpacity: 0.95 });
+          const bNome = document.getElementById('hoverBairroNome');
+          const bFrota = document.getElementById('hoverFrota');
+          const bRisco = document.getElementById('hoverRisco');
+          if (bNome) {
+            bNome.innerText = `${item.bairro} (${item.prefixo_5d})`;
+            bNome.style.color = item.cor;
+          }
+          if (bFrota) {
+            bFrota.innerHTML = `🚘 Frota Segurada: <b style="color:#38bdf8;">${item.veiculos_expostos.toFixed(1)} veículos</b>`;
+          }
+          if (bRisco) {
+            bRisco.innerHTML = `📊 Risco Puro: <b style="color:${item.cor};">${item.taxa_risco_puro_fipe.toFixed(2)}% FIPE (${item.fator_risco.toFixed(2)}x)</b>`;
+          }
+        });
+
+        circle.on('mouseout', () => {
+          circle.setStyle({ weight: 2, fillOpacity: 0.65 });
+          const bNome = document.getElementById('hoverBairroNome');
+          const bFrota = document.getElementById('hoverFrota');
+          const bRisco = document.getElementById('hoverRisco');
+          if (bNome) {
+            bNome.innerText = 'Passe o mouse em um ponto...';
+            bNome.style.color = '#ffffff';
+          }
+          if (bFrota) {
+            bFrota.innerHTML = '🚘 Frota: <b>-- veículos</b>';
+          }
+          if (bRisco) {
+            bRisco.innerHTML = '📊 Risco Puro: <b>--% FIPE</b>';
+          }
+        });
+
+        // Evento de clique para abrir o HUD de Detalhes
+        circle.on('click', () => {
+          abrirDetalhe(item);
+          map.flyTo([item.lat, item.lon], 14, { duration: 0.8 });
+        });
+
+        circle.itemData = item;
+        markers.push(circle);
+      });
+    }
+
+    function abrirDetalhe(item) {
+      document.getElementById('detBairro').innerText = item.bairro;
+      document.getElementById('detZone').innerText = `${item.zona} • CEP ${item.prefixo_5d}`;
+      document.getElementById('detCustoPuro').innerText = `${item.taxa_risco_puro_fipe.toFixed(2)}%`;
+      document.getElementById('detCustoPuro').style.color = item.cor;
+      document.getElementById('detFator').innerText = `${item.fator_risco.toFixed(2)}x`;
+      document.getElementById('detFator').style.color = item.cor;
+      document.getElementById('detDiag').innerText = item.diagnostico;
+      document.getElementById('detDiag').style.color = item.cor;
+
+      document.getElementById('detFreqPT').innerText = `${item.freq_pt.toFixed(2)}% ao ano`;
+      document.getElementById('detFreqCol').innerText = `${item.freq_colisao.toFixed(2)}% ao ano`;
+      document.getElementById('detSinistros').innerText = `${item.sin_pt} PTs / ${item.sin_colisao} colisões`;
+      document.getElementById('detPremioMed').innerText = `R$ ${item.premio_medio_rs.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+      document.getElementById('detExpostos').innerText = `${item.veiculos_expostos.toFixed(1)} veículos-ano`;
+      document.getElementById('detFaixa').innerText = item.faixa_cep;
+
+      document.getElementById('detailCard').style.display = 'block';
+    }
+
+    function fecharDetalhe() {
+      document.getElementById('detailCard').style.display = 'none';
+    }
+
+    function filtrarRisco(nivel, btn) {
+      filtroAtual = nivel;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderMarkers();
+    }
+
+    // Busca dinâmica por Bairro ou CEP
+    document.getElementById('searchBox').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      if (!q) return;
+
+      const achado = bairrosData.find(b => 
+        b.bairro.toLowerCase().includes(q) || 
+        b.prefixo_5d.includes(q)
+      );
+
+      if (achado) {
+        abrirDetalhe(achado);
+        map.flyTo([achado.lat, achado.lon], 14, { duration: 0.8 });
+      }
+    });
+
+    // Renderização inicial
+    renderMarkers();
+  </script>
+</body>
+</html>
